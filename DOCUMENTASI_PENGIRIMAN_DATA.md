@@ -1,368 +1,310 @@
-# Dokumentasi Pengiriman Data dari SIMKlinik ke SATUSEHAT Service
+# Dokumentasi Pengiriman Data ke SATUSEHAT
 
-## Panduan Umum
+## Panduan Penggunaan Layanan untuk Klinik
 
-Layanan SATUSEHAT ini dirancang untuk menerima data dari berbagai klinik (SIMKlinik) dan mengirimkannya ke platform SATUSEHAT. Setiap klinik harus memiliki kode unik yang digunakan untuk otentikasi dan identifikasi dalam sistem.
+Layanan ini dirancang agar mudah digunakan oleh klinik untuk mengintegrasikan data mereka ke SATUSEHAT. Berikut adalah panduan untuk klinik dalam menggunakan layanan ini:
 
-## Konfigurasi Klinik
+### 1. Endpoint API
 
-Sebelum mengirim data, pastikan klinik Anda telah terdaftar di sistem dengan informasi berikut:
-- `code`: Kode unik klinik (misal: KLINIK-001)
-- `name`: Nama klinik
-- `satusehat_client_id`: Client ID dari SATUSEHAT
-- `satusehat_client_secret`: Client Secret dari SATUSEHAT
-- `organization_id`: ID Organisasi di SATUSEHAT
-
-## Format Otentikasi
-
-Setiap permintaan ke layanan SATUSEHAT harus menyertakan header otentikasi klinik:
+Semua endpoint memerlukan header otentikasi klinik:
 
 ```
-X-Clinic-Code: [kode_klinik]
-X-Clinic-Secret: [secret_klinik]
+X-Clinic-Code: [kode klinik]
+X-Clinic-Secret: [secret klinik]
 ```
 
-## Endpoint API
+### 2. Fungsi Utama
 
-Semua endpoint menggunakan format dasar: `https://[domain-service]/api/`
+#### A. Mengambil ID SATUSEHAT
 
-## 1. Pengiriman Data Kunjungan (Encounter)
-
-### Endpoint
+**Mengambil ID Pasien berdasarkan NIK:**
 ```
-POST /api/encounter
-```
-
-### Header
-```
-X-Clinic-Code: [kode_klinik]
-X-Clinic-Secret: [secret_klinik]
-Content-Type: application/json
+GET /api/satusehat/get-patient-nik
+Parameter: nik (string, 16 digit)
 ```
 
-### Request Body
-```json
+**Mengambil ID Dokter berdasarkan NIK/SIP/STR:**
+```
+GET /api/satusehat/get-practitioner-id
+Parameter: nik (opsional), sip (opsional), str (opsional)
+```
+
+**Mengambil ID Poli berdasarkan kode:**
+```
+GET /api/satusehat/get-healthcare-service-id
+Parameter: kode_poli (string)
+```
+
+#### B. Registrasi Data Dasar
+
+**Mendaftarkan Pasien Baru:**
+```
+POST /api/satusehat/register-patient
+Body:
 {
-    "id": "encounter-id-optional",
-    "pasien_id": "patient-id-from-satusehat",
-    "tanggal_kunjungan": "2024-01-01T10:00:00Z",
-    "tanggal_selesai": "2024-01-01T11:00:00Z",
-    "jenis_layanan": "101", 
-    "jenis_kunjungan": "1",
-    "poli": "100001",
-    "dokter": "practitioner-id-from-satusehat",
-    "penjamin": "1",
-    "keluhan_utama": "Sakit kepala",
-    "anamnesa": "Pasien datang dengan keluhan...",
-    "pemeriksaan_fisik": {
-        "tanda_vital": {
-            "tekanan_darah": "120/80",
-            "nadi": 80,
-            "suhu": 36.5,
-            "pernapasan": 20,
-            "tinggi": 170,
-            "berat": 70
+  "nik": "string, 16 digit",
+  "name": "string",
+  "birth_date": "date",
+  "gender": "L/P",
+  "address": "string",
+  "province_code": "string",
+  "city_code": "string",
+  "district_code": "string",
+  "village_code": "string",
+  "phone": "string",
+  "nationality": "string"
+}
+```
+
+**Mendaftarkan Dokter Baru:**
+```
+POST /api/satusehat/register-practitioner
+Body:
+{
+  "nik": "string, 16 digit",
+  "name": "string",
+  "sip": "string",
+  "str": "string",
+  "birth_date": "date",
+  "gender": "L/P",
+  "address": "string",
+  "phone": "string",
+  "email": "email"
+}
+```
+
+#### C. Pengiriman Data Klinis
+
+**Mengirim Data Kunjungan:**
+```
+POST /api/satusehat/send-encounter
+Body:
+{
+  "patient_id": "string",
+  "practitioner_id": "string",
+  "status": "string",
+  "class_code": "string",
+  "class_display": "string",
+  "period_start": "datetime",
+  "period_end": "datetime",
+  "type_code": "string (opsional)",
+  "type_display": "string (opsional)",
+  "reason_code": "string (opsional)",
+  "reason_display": "string (opsional)"
+}
+```
+
+**Mengirim Data Observasi:**
+```
+POST /api/satusehat/send-observation
+Body:
+{
+  "patient_id": "string",
+  "category_code": "string",
+  "category_display": "string",
+  "code": {
+    "code": "string",
+    "display": "string",
+    "system": "string (opsional)"
+  },
+  "value": "mixed",
+  "value_type": "string (quantity, string, boolean, integer, range, ratio, sampled-data, time, datetime, period)",
+  "effective_date": "datetime (opsional)",
+  "status": "string (opsional)",
+  "practitioner_id": "string (opsional)",
+  "encounter_id": "string (opsional)"
+}
+```
+
+**Mengirim Data Prosedur:**
+```
+POST /api/satusehat/send-procedure
+Body:
+{
+  "patient_id": "string",
+  "practitioner_id": "string",
+  "code": {
+    "code": "string",
+    "display": "string",
+    "system": "string (opsional)"
+  },
+  "category_code": "string (opsional)",
+  "category_display": "string (opsional)",
+  "performed_date": "datetime (opsional)",
+  "status": "string (opsional)",
+  "encounter_id": "string (opsional)"
+}
+```
+
+**Mengirim Data Kondisi (Diagnosis):**
+```
+POST /api/satusehat/send-condition
+Body:
+{
+  "patient_id": "string",
+  "code": {
+    "code": "string",
+    "display": "string",
+    "system": "string (opsional)"
+  },
+  "clinical_status": "string (opsional)",
+  "verification_status": "string (opsional)",
+  "onset_date": "datetime (opsional)",
+  "recorded_date": "datetime (opsional)",
+  "practitioner_id": "string (opsional)",
+  "encounter_id": "string (opsional)"
+}
+```
+
+### 3. Contoh Penggunaan
+
+Berikut adalah contoh cara menggunakan layanan ini dari sisi klinik:
+
+```php
+<?php
+// Contoh koneksi ke layanan SATUSEHAT
+class SatuSehatClient {
+    private $baseUrl;
+    private $clinicCode;
+    private $clinicSecret;
+    
+    public function __construct($baseUrl, $clinicCode, $clinicSecret) {
+        $this->baseUrl = $baseUrl;
+        $this->clinicCode = $clinicCode;
+        $this->clinicSecret = $clinicSecret;
+    }
+    
+    private function sendRequest($endpoint, $data, $method = 'POST') {
+        $url = $this->baseUrl . $endpoint;
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'X-Clinic-Code: ' . $this->clinicCode,
+            'X-Clinic-Secret: ' . $this->clinicSecret,
+            'Content-Type: application/json',
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            throw new Exception("cURL Error: " . $error);
         }
+        
+        if ($httpCode >= 400) {
+            throw new Exception("HTTP Error: {$httpCode} - {$response}");
+        }
+        
+        return json_decode($response, true);
+    }
+    
+    // Kirim data kunjungan
+    public function kirimEncounter($data) {
+        return $this->sendRequest('/api/encounter', $data);
+    }
+    
+    // Kirim data diagnosis
+    public function kirimDiagnosis($data) {
+        return $this->sendRequest('/api/diagnosis', $data);
+    }
+    
+    // Kirim data observasi
+    public function kirimObservation($data) {
+        return $this->sendRequest('/api/observation', $data);
+    }
+    
+    // Kirim data prosedur
+    public function kirimProcedure($data) {
+        return $this->sendRequest('/api/procedure', $data);
+    }
+    
+    // Dapatkan ID SATUSEHAT pasien berdasarkan NIK
+    public function getPatientId($nik) {
+        return $this->sendRequest('/api/satusehat/get-patient-nik', ['nik' => $nik], 'GET');
+    }
+    
+    // Dapatkan ID SATUSEHAT dokter
+    public function getPractitionerId($nik, $sip = null, $str = null) {
+        $data = ['nik' => $nik];
+        if ($sip) $data['sip'] = $sip;
+        if ($str) $data['str'] = $str;
+        
+        return $this->sendRequest('/api/satusehat/get-practitioner-id', $data, 'GET');
+    }
+    
+    // Dapatkan ID SATUSEHAT poli
+    public function getHealthcareServiceId($kodePoli) {
+        return $this->sendRequest('/api/satusehat/get-healthcare-service-id', ['kode_poli' => $kodePoli], 'GET');
+    }
+    
+    // Registrasi pasien baru
+    public function registerPatient($data) {
+        return $this->sendRequest('/api/satusehat/register-patient', $data);
+    }
+    
+    // Registrasi dokter baru
+    public function registerPractitioner($data) {
+        return $this->sendRequest('/api/satusehat/register-practitioner', $data);
     }
 }
 ```
 
-### Deskripsi Field
-- `pasien_id`: ID pasien dari SATUSEHAT
-- `tanggal_kunjungan`: Tanggal dan waktu kunjungan dalam format ISO 8601
-- `tanggal_selesai`: Tanggal dan waktu selesai kunjungan
-- `jenis_layanan`: Kode jenis layanan (101=Rawat Jalan, 102=Rawat Inap, dll)
-- `jenis_kunjungan`: Kode jenis kunjungan (1=Kunjungan Baru, 2=Kunjungan Lama)
-- `poli`: Kode poli dari SATUSEHAT
-- `dokter`: ID dokter/praktisi dari SATUSEHAT
-- `penjamin`: Kode penjamin pembayaran
-- `keluhan_utama`: Keluhan utama pasien
-- `anamnesa`: Riwayat penyakit dan informasi klinis tambahan
-- `pemeriksaan_fisik`: Data pemeriksaan fisik termasuk tanda vital
+### 4. Alur Pengiriman Data
 
-## 2. Pengiriman Data Prosedur (Procedure)
+1. **Persiapkan Data Dasar**:
+   - Dapatkan ID SATUSEHAT untuk pasien, dokter, dan poli
+   - Jika belum ada, daftarkan data dasar terlebih dahulu
 
-### Endpoint
-```
-POST /api/procedure
-```
+2. **Kirim Data Klinis**:
+   - Kirim data kunjungan (Encounter)
+   - Kirim data observasi (Observation)
+   - Kirim data prosedur (Procedure)
+   - Kirim data diagnosis (Condition)
 
-### Header
-```
-X-Clinic-Code: [kode_klinik]
-X-Clinic-Secret: [secret_klinik]
-Content-Type: application/json
-```
+### 5. Penanganan Kesalahan
 
-### Request Body
-```json
-{
-    "id": "procedure-id-optional",
-    "encounter_id": "encounter-id-from-satusehat",
-    "pasien_id": "patient-id-from-satusehat",
-    "tanggal_prosedur": "2024-01-01T10:30:00Z",
-    "kode_prosedur": "17.1",
-    "deskripsi_prosedur": "Insisi dan ekstraksi dari kista atau abses",
-    "kode_metode": "3951000132103",
-    "deskripsi_metode": "Metode insisi",
-    "kode_alat": "27724004",
-    "deskripsi_alat": "Scalpel",
-    "kondisi_klinis": "Abses pada lengan",
-    "komplikasi": "Tidak ada",
-    "hasil": "Prosedur berhasil, tidak ada komplikasi"
-}
-```
+- Pastikan semua data yang dikirim telah sesuai dengan standar SATUSEHAT
+- Gunakan format tanggal dan waktu yang benar (ISO 8601)
+- Pastikan NIK dan kode unik lainnya valid
+- Periksa kembali header otentikasi klinik
 
-### Deskripsi Field
-- `encounter_id`: ID kunjungan dari SATUSEHAT
-- `pasien_id`: ID pasien dari SATUSEHAT
-- `tanggal_prosedur`: Tanggal dan waktu prosedur dalam format ISO 8601
-- `kode_prosedur`: Kode prosedur berdasarkan ICD-9-CM atau standar SATUSEHAT
-- `deskripsi_prosedur`: Deskripsi dari prosedur yang dilakukan
-- `kode_metode`: Kode metode prosedur
-- `deskripsi_metode`: Deskripsi metode yang digunakan
-- `kode_alat`: Kode alat yang digunakan dalam prosedur
-- `deskripsi_alat`: Deskripsi alat yang digunakan
-- `kondisi_klinis`: Kondisi klinis yang menjadi indikasi prosedur
-- `komplikasi`: Komplikasi yang terjadi (jika ada)
-- `hasil`: Hasil dari prosedur
+### 6. Error Codes
 
-## 3. Pengiriman Data Observasi (Observation)
+- `PASIENT_NOT_FOUND`: Pasien tidak ditemukan di SATUSEHAT
+- `PRACTITIONER_NOT_FOUND`: Dokter tidak ditemukan di SATUSEHAT
+- `HEALTHCARE_SERVICE_NOT_FOUND`: Poli tidak ditemukan di SATUSEHAT
+- `INVALID_CREDENTIALS`: Kredensial klinik tidak valid
+- `MISSING_REQUIRED_FIELDS`: Data yang dikirim tidak lengkap
+- `FHIR_VALIDATION_ERROR`: Data tidak sesuai standar FHIR
 
-### Endpoint
-```
-POST /api/observation
-```
+## Best Practices
 
-### Header
-```
-X-Clinic-Code: [kode_klinik]
-X-Clinic-Secret: [secret_klinik]
-Content-Type: application/json
-```
+### 1. Pengiriman Data
+- Gunakan NIK pasien untuk kemudahan integrasi
+- Simpan ID SATUSEHAT dokter dan poli secara lokal setelah pertama kali diperoleh
+- Gunakan batch processing untuk data dalam jumlah besar
+- Implementasikan retry mechanism untuk permintaan yang gagal
 
-### Request Body
-```json
-{
-    "id": "observation-id-optional",
-    "encounter_id": "encounter-id-from-satusehat",
-    "pasien_id": "patient-id-from-satusehat",
-    "tanggal_observasi": "2024-01-01T10:15:00Z",
-    "kategori": {
-        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
-        "code": "vital-signs",
-        "display": "Vital Signs"
-    },
-    "kode": {
-        "coding": [
-            {
-                "system": "http://loinc.org",
-                "code": "85354-9",
-                "display": "Blood pressure panel with all children optional"
-            }
-        ],
-        "text": "Blood pressure systolic and diastolic"
-    },
-    "nilai": {
-        "value": 120,
-        "unit": "mmHg",
-        "system": "http://unitsofmeasure.org",
-        "code": "mm[Hg]"
-    },
-    "nilai_diatas": {
-        "value": 80,
-        "unit": "mmHg",
-        "system": "http://unitsofmeasure.org",
-        "code": "mm[Hg]"
-    },
-    "interpretasi": "Normal",
-    "keterangan": "Tekanan darah dalam batas normal"
-}
-```
+### 2. Keamanan
+- Jangan hardcode kredensial di kode sumber
+- Gunakan environment variable atau file konfigurasi terenkripsi
+- Pastikan koneksi ke SATUSEHAT Service menggunakan HTTPS
+- Batasi akses ke endpoint hanya dari IP yang terpercaya
 
-### Deskripsi Field
-- `encounter_id`: ID kunjungan dari SATUSEHAT
-- `pasien_id`: ID pasien dari SATUSEHAT
-- `tanggal_observasi`: Tanggal dan waktu observasi dalam format ISO 8601
-- `kategori`: Kategori observasi (vital-signs, laboratory, dll)
-- `kode`: Kode dan deskripsi observasi (menggunakan LOINC atau standar lainnya)
-- `nilai`: Nilai observasi utama (sistolik dalam contoh tekanan darah)
-- `nilai_diatas`: Nilai observasi tambahan (diastolik dalam contoh tekanan darah)
-- `interpretasi`: Interpretasi hasil (Normal, Abnormal, dll)
-- `keterangan`: Keterangan tambahan tentang observasi
+### 3. Performa
+- Gunakan caching untuk ID SATUSEHAT yang sering diakses
+- Implementasikan queue untuk pengiriman data
+- Gunakan batch processing untuk data yang banyak
+- Optimalkan query database untuk pencarian data
 
-## 4. Pengiriman Data Diagnosis (Condition)
-
-### Endpoint
-```
-POST /api/diagnosis
-```
-
-### Header
-```
-X-Clinic-Code: [kode_klinik]
-X-Clinic-Secret: [secret_klinik]
-Content-Type: application/json
-```
-
-### Request Body
-```json
-{
-    "id": "condition-id-optional",
-    "encounter_id": "encounter-id-from-satusehat",
-    "pasien_id": "patient-id-from-satusehat",
-    "tanggal_diagnosis": "2024-01-01T10:45:00Z",
-    "kode_icd10": "I10",
-    "deskripsi_diagnosis": "Hipertensi esensial",
-    "kategori": [
-        {
-            "coding": [
-                {
-                    "system": "http://terminology.hl7.org/CodeSystem/condition-category",
-                    "code": "encounter-diagnosis",
-                    "display": "Encounter Diagnosis"
-                }
-            ]
-        }
-    ],
-    "klinis_status": "active",
-    "verifikasi_status": "confirmed",
-    "onset_date": "2024-01-01T10:45:00Z",
-    "keterangan": "Diagnosis primer berdasarkan hasil pemeriksaan",
-    "tingkat_keparahan": {
-        "coding": [
-            {
-                "system": "http://snomed.info/sct",
-                "code": "24484000",
-                "display": "Severe"
-            }
-        ],
-        "text": "Berat"
-    }
-}
-```
-
-### Deskripsi Field
-- `encounter_id`: ID kunjungan dari SATUSEHAT
-- `pasien_id`: ID pasien dari SATUSEHAT
-- `tanggal_diagnosis`: Tanggal dan waktu diagnosis dalam format ISO 8601
-- `kode_icd10`: Kode diagnosis berdasarkan ICD-10
-- `deskripsi_diagnosis`: Deskripsi dari diagnosis
-- `kategori`: Kategori diagnosis (encounter-diagnosis, problem-list-item, dll)
-- `klinis_status`: Status klinis (active, inactive, recurrence, dll)
-- `verifikasi_status`: Status verifikasi (confirmed, unconfirmed, provisional, dll)
-- `onset_date`: Tanggal mulai kondisi
-- `keterangan`: Keterangan tambahan tentang diagnosis
-- `tingkat_keparahan`: Tingkat keparahan kondisi
-
-## Contoh Implementasi di SIMKlinik
-
-### Contoh Pengiriman Kunjungan
-```php
-// Dari sistem SIMKlinik
-$kunjunganData = [
-    'pasien_id' => $pasienSatuSehatId,
-    'tanggal_kunjungan' => $kunjungan->tanggal_berobat,
-    'tanggal_selesai' => $kunjungan->tanggal_selesai,
-    'jenis_layanan' => $kunjungan->jenis_layanan,
-    'jenis_kunjungan' => $kunjungan->jenis_kunjungan,
-    'poli' => $kunjungan->kode_poli,
-    'dokter' => $dokterSatuSehatId,
-    'penjamin' => $kunjungan->kode_penjamin,
-    'keluhan_utama' => $kunjungan->keluhan_utama,
-    'anamnesa' => $kunjungan->anamnesa,
-    'pemeriksaan_fisik' => [
-        'tanda_vital' => [
-            'tekanan_darah' => $kunjungan->tekanan_darah,
-            'nadi' => $kunjungan->nadi,
-            'suhu' => $kunjungan->suhu,
-            'pernapasan' => $kunjungan->pernapasan,
-            'tinggi' => $kunjungan->tinggi,
-            'berat' => $kunjungan->berat
-        ]
-    ]
-];
-
-// Kirim ke SATUSEHAT service
-$response = Http::withHeaders([
-    'X-Clinic-Code' => $clinicCode,
-    'X-Clinic-Secret' => $clinicSecret,
-])->post('https://[domain-service]/api/encounter', $kunjunganData);
-```
-
-### Contoh Pengiriman Diagnosis
-```php
-// Dari sistem SIMKlinik
-$diagnosisData = [
-    'encounter_id' => $encounterSatuSehatId,
-    'pasien_id' => $pasienSatuSehatId,
-    'tanggal_diagnosis' => $diagnosis->tanggal_diagnosis,
-    'kode_icd10' => $diagnosis->kode_icd10,
-    'deskripsi_diagnosis' => $diagnosis->deskripsi,
-    'kategori' => [
-        [
-            'coding' => [
-                [
-                    'system' => 'http://terminology.hl7.org/CodeSystem/condition-category',
-                    'code' => 'encounter-diagnosis',
-                    'display' => 'Encounter Diagnosis'
-                ]
-            ]
-        ]
-    ],
-    'klinis_status' => 'active',
-    'verifikasi_status' => 'confirmed',
-    'onset_date' => $diagnosis->tanggal_diagnosis,
-    'keterangan' => $diagnosis->keterangan
-];
-
-// Kirim ke SATUSEHAT service
-$response = Http::withHeaders([
-    'X-Clinic-Code' => $clinicCode,
-    'X-Clinic-Secret' => $clinicSecret,
-])->post('https://[domain-service]/api/diagnosis', $diagnosisData);
-```
-
-## Penanganan Error dan Status
-
-### Response Format
-```json
-{
-    "status": "queued|success|error",
-    "log_id": "log-id-untuk-tracing",
-    "message": "optional message",
-    "data": {}
-}
-```
-
-### Kode Status HTTP
-- `202`: Request diterima dan diproses (Accepted)
-- `400`: Request tidak valid (Bad Request)
-- `401`: Tidak diotentikasi (Unauthorized)
-- `403`: Tidak diotorisasi (Forbidden)
-- `422`: Data tidak valid (Unprocessable Entity)
-- `500`: Kesalahan server (Internal Server Error)
-
-## Penanganan Kesalahan dan Retry
-
-Layanan ini memiliki mekanisme retry otomatis untuk permintaan yang gagal. Namun, untuk pengiriman data penting, SIMKlinik sebaiknya:
-
-1. Menyimpan status pengiriman lokal
-2. Mengecek status pengiriman secara berkala
-3. Melakukan retry manual jika diperlukan
-4. Mencatat log kesalahan untuk ditindaklanjuti
-
-## Tips Implementasi
-
-1. Pastikan data pasien sudah dikirim dan terdaftar di SATUSEHAT sebelum mengirim data kunjungan
-2. Gunakan ID unik dari SATUSEHAT untuk referensi (bukan ID lokal)
-3. Simpan response dari setiap pengiriman untuk keperluan tracking
-4. Gunakan endpoint staging untuk pengujian sebelum ke production
-5. Pastikan semua data yang dikirim dalam format yang sesuai standar FHIR
-6. Gunakan endpoint `/satusehat/token/{clinicCode}` untuk menguji otentikasi klinik
-
-## Testing Endpoint
-
-Untuk keperluan pengujian:
-- Endpoint token: `GET /api/satusehat/token/{clinicCode}`
-- Endpoint uji pasien: `POST /api/satusehat/test-patient/{clinicCode}`
+### 4. Pemantauan
+- Implementasikan logging untuk semua permintaan
+- Buat dashboard untuk melihat status pengiriman data
+- Tampilkan jumlah data yang berhasil/gagal dikirim
+- Tampilkan log error dan solusi umum

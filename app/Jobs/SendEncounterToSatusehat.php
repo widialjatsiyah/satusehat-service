@@ -12,6 +12,104 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log as Logger;
 
+class SendSatusehatResourceJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    protected $logId;
+
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct($logId)
+    {
+        $this->logId = $logId;
+    }
+
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        $log = SatusehatLog::find($this->logId);
+        if (!$log) {
+            Logger::error('Log not found for SendSatusehatResourceJob job', ['log_id' => $this->logId]);
+            return;
+        }
+
+        $clinic = $log->clinic;
+        $satuSehatService = new SatuSehatService($clinic);
+
+        try {
+            // Determine the resource type and call the appropriate method
+            $payload = json_decode($log->request_payload, true);
+            $response = null;
+
+            switch ($log->resource_type) {
+                case 'Encounter':
+                    $response = $satuSehatService->sendEncounter($payload);
+                    break;
+                case 'Patient':
+                    $response = $satuSehatService->registerPatient($payload);
+                    break;
+                case 'Practitioner':
+                    $response = $satuSehatService->registerPractitioner($payload);
+                    break;
+                case 'Observation':
+                    $response = $satuSehatService->sendObservation($payload);
+                    break;
+                case 'Procedure':
+                    $response = $satuSehatService->sendProcedure($payload);
+                    break;
+                case 'Condition':
+                    $response = $satuSehatService->sendCondition($payload);
+                    break;
+                default:
+                    throw new \Exception("Unknown resource type: {$log->resource_type}");
+            }
+
+            $log->update([
+                'response_payload' => json_encode($response),
+                'status' => 'SUCCESS'
+            ]);
+        } catch (\Exception $e) {
+            $log->increment('retry_count');
+            $log->update(['status' => 'FAILED', 'response_payload' => $e->getMessage()]);
+
+            Logger::error('Failed to send ' . $log->resource_type . ' to SATUSEHAT', [
+                'clinic_id' => $clinic->id,
+                'clinic_code' => $clinic->code,
+                'log_id' => $this->logId,
+                'resource_type' => $log->resource_type,
+                'error' => $e->getMessage()
+            ]);
+
+            // Retry strategy
+            if ($log->retry_count < 5) {
+                // Re-dispatch with delay (exponential backoff)
+                self::dispatch($this->logId)->delay(now()->addSeconds(30 * $log->retry_count));
+            }
+        }
+    }
+}
+<?php
+
+namespace App\Jobs;
+
+use App\Models\SatusehatLog;
+use App\Services\SatuSehatService;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log as Logger;
+
 class SendEncounterToSatusehat implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -40,7 +138,7 @@ class SendEncounterToSatusehat implements ShouldQueue
             Logger::error('Log not found for SendEncounterToSatusehat job', ['log_id' => $this->logId]);
             return;
         }
-        
+
         $clinic = $log->clinic;
         $satuSehatService = new SatuSehatService($clinic);
 
@@ -56,14 +154,14 @@ class SendEncounterToSatusehat implements ShouldQueue
         } catch (\Exception $e) {
             $log->increment('retry_count');
             $log->update(['status' => 'FAILED', 'response_payload' => $e->getMessage()]);
-            
+
             Logger::error('Failed to send encounter to SATUSEHAT', [
                 'clinic_id' => $clinic->id,
                 'clinic_code' => $clinic->code,
                 'log_id' => $this->logId,
                 'error' => $e->getMessage()
             ]);
-            
+
             // Retrying strategy
             if ($log->retry_count < 5) {
                 // re-dispatch with delay (exponential backoff)
