@@ -71,17 +71,9 @@ class SatusehatIdController extends Controller
             ], 500);
         }
 
-        return response()->json([
-            'meta' => [
-                'code' => 500,
-                'message' => 'An error occurred while processing your request',
-                'clinic_id' => $clinic->code
-            ],
-            'data' => [
-                'error_detail' => $e->getMessage()
-            ]
-        ], 500);
     }
+
+
 
     public function getPatientByID(Request $request)
     {
@@ -715,7 +707,7 @@ class SatusehatIdController extends Controller
             'encounter' => 'required|array',
             'encounter.registration_number' => 'required|string',
             'encounter.consultation_method' => 'required|string',
-            'encounter.patient_id' => 'required|string',
+            'encounter.nik_pasien' => 'required|string',
             'encounter.patient_name' => 'required|string',
             'encounter.practitioner_id' => 'required|string',
             'encounter.practitioner_name' => 'required|string',
@@ -723,7 +715,7 @@ class SatusehatIdController extends Controller
             'encounter.location_name' => 'required|string',
             'conditions' => 'required|array',
             'conditions.*.icd10_code' => 'required|string',
-            'conditions.*.patient_id' => 'required|string',
+            'conditions.*.nik_pasien' => 'required|string',
             'conditions.*.patient_name' => 'required|string',
         ]);
 
@@ -742,7 +734,9 @@ class SatusehatIdController extends Controller
             $finished = Carbon::now('Asia/Jakarta')
                 ->addMinutes(62)
                 ->format('Y-m-d\TH:i:sP');
-
+                    // dd($request->encounter['nik_pasien']);
+                $patientId = $this->getIdpatientByNik($request->encounter['nik_pasien'], $clinic);
+                // dd($patientId);
             // Prepare encounter data
             $encounterData = [
                 'registration_number' => $request->encounter['registration_number'],
@@ -751,7 +745,7 @@ class SatusehatIdController extends Controller
                 'in_progress_end' => $request->encounter['in_progress_end'] ?? $inprogress_end,
                 'finished' => $request->encounter['finished'] ?? $finished,
                 'consultation_method' => $request->encounter['consultation_method'],
-                'patient_id' => $request->encounter['patient_id'],
+                'patient_id' => $patientId,
                 'patient_name' => $request->encounter['patient_name'],
                 'practitioner_id' => $request->encounter['practitioner_id'],
                 'practitioner_name' => $request->encounter['practitioner_name'],
@@ -766,7 +760,7 @@ class SatusehatIdController extends Controller
                     'clinical_status' => $condition['clinical_status'] ?? 'active',
                     'category' => $condition['category'] ?? 'Diagnosis',
                     'icd10_code' => $condition['icd10_code'],
-                    'patient_id' => $condition['patient_id'],
+                    'patient_id' => $patientId,
                     'patient_name' => $condition['patient_name'],
                     'onset_date_time' => $condition['onset_date_time'] ?? $timeonset,
                     'recorded_date' => $condition['recorded_date'] ?? now()->format('c'),
@@ -823,6 +817,44 @@ class SatusehatIdController extends Controller
                 'meta' => [
                     'code' => 500,
                     'message' => $e->getMessage(),
+                    'clinic_id' => $clinic->code
+                ],
+                'data' => [
+                    'error_detail' => $e->getMessage()
+                ]
+            ], 500);
+        }
+    }
+
+     public function getIdpatientByNik($nik, Clinic $clinic)
+    {
+
+        try {
+            $satuSehatService = new SatuSehatService($clinic);
+
+            // Using the library's built-in method to search for patient
+            $response = $satuSehatService->get_by_nik('Patient', $nik);
+
+            // dd($response);
+            // Check if response is an array with two elements (header, body) or just the body
+            if (is_array($response) && isset($response['response'])) {
+                $data = $response['response'];
+            } else {
+                $data = $response;
+            }
+            // dd($data->entry[0]->resource->id);
+            if (isset($data->entry[0]) && count($data->entry) > 0) {
+                $patientId = $data->entry[0]->resource->id;
+                return $patientId;
+            } else {
+                return null;
+            }
+        } catch (\Exception $e) {
+
+            return response()->json([
+                'meta' => [
+                    'code' => 500,
+                    'message' => 'An error occurred while processing your request',
                     'clinic_id' => $clinic->code
                 ],
                 'data' => [
