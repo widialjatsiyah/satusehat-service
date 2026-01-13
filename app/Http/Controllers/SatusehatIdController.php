@@ -887,17 +887,45 @@ class SatusehatIdController extends Controller
 
             // Send location to SATUSEHAT using the service
             $response = $satuSehatService->sendLocation($request->all());
-
-            return response()->json([
-                'meta' => [
-                    'code' => 200,
-                    'message' => 'Location sent successfully',
-                    'clinic_id' => $clinic->code
-                ],
-                'data' => [
-                    'id' => $response['id'] ?? null
-                ]
-            ], 200);
+  if (is_array($response) && isset($response['response'])) {
+                $data = $response['response'];
+            } else {
+                $data = $response;
+            }
+            // dd($data->id);
+            // dd($data->entry[0]->resource->id);
+            if ($data->id) {
+                $location = $data->id;
+                return response()->json([
+                    'meta' => [
+                        'code' => 200,
+                        'message' => 'success',
+                        'clinic_id' => $clinic->code
+                    ],
+                    'data' => [
+                        'satusehat_id' => $location
+                    ]
+                ], 200);
+            } else {
+                return response()->json([
+                    'meta' => [
+                        'code' => 404,
+                        'message' => 'Patient not found in SATUSEHAT',
+                        'clinic_id' => $clinic->code
+                    ],
+                    'data' => null
+                ], 404);
+            }
+            // return response()->json([
+            //     'meta' => [
+            //         'code' => 200,
+            //         'message' => 'Location sent successfully',
+            //         'clinic_id' => $clinic->code
+            //     ],
+            //     'data' => [
+            //         'id' => $response['id'] ?? null
+            //     ]
+            // ], 200);
         } catch (\Exception $e) {
             Log::error('Exception in sendLocation', [
                 'clinic_id' => $clinic->code,
